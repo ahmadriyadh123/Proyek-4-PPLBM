@@ -14,29 +14,99 @@ class _CounterViewState extends State<CounterView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("LogBook: SRP Version")),
-      body: Center(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Total Hitungan:"),
-            Text('${_controller.value}', 
-            style: const TextStyle(fontSize: 40)),
-            const SizedBox(height: 20),
-            Text("Step: ${_controller.step}"),
-            SizedBox( 
-                width: 100, 
-                child: TextField( 
-                    keyboardType: TextInputType.number, 
-                    decoration: const InputDecoration(labelText: "Step"), 
-                    onSubmitted: (val) { final stepValue = int.tryParse(val); 
-                    if (stepValue != null && stepValue > 0) { setState(() => _controller.step = stepValue); 
-                    } 
-                },
+            // Counter Display Card
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 30.0, horizontal: 20.0),
+                child: Column(
+                  children: [
+                    const Text("Total Hitungan", style: TextStyle(fontSize: 18, color: Colors.grey)),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${_controller.value}',
+                      style: const TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                    ),
+                  ],
                 ),
+              ),
             ),
-                const SizedBox(height: 20), 
-                const Text("History:"), 
-                ..._controller.history.map((item) => Text(item)).toList(),
+            const SizedBox(height: 20),
+
+            // Step Configuration
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Step:", style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 15),
+                SizedBox(
+                  width: 80,
+                  child: TextField(
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    controller: TextEditingController(text: _controller.step.toString()),
+                    onSubmitted: (val) {
+                      final stepValue = int.tryParse(val);
+                      if (stepValue != null && stepValue > 0) {
+                        setState(() => _controller.step = stepValue);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+
+            // History Log
+            const Text("History Log", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListView( // Changed from Map to ListView for better scrolling if needed, but constrained height
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _controller.history.isEmpty
+                    ? [const Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text("-")))]
+                    : _controller.history.map((item) {
+                        Color textColor = Colors.black87;
+                        IconData icon = Icons.circle; 
+                        Color iconColor = Colors.grey;
+
+                        if (item.toLowerCase().contains('increment')) {
+                          textColor = Colors.green[800]!;
+                          icon = Icons.arrow_upward;
+                          iconColor = Colors.green;
+                        } else if (item.toLowerCase().contains('decrement')) {
+                          textColor = Colors.red[800]!;
+                          icon = Icons.arrow_downward;
+                          iconColor = Colors.red;
+                        } else if (item.toLowerCase().contains('reset')) {
+                           icon = Icons.refresh;
+                           iconColor = Colors.blue;
+                        }
+
+                        return ListTile(
+                          leading: Icon(icon, color: iconColor, size: 20),
+                          title: Text(item, style: TextStyle(color: textColor, fontWeight: FontWeight.w500)),
+                          dense: true,
+                        );
+                      }).toList(),
+              ),
+            ),
           ],
         ),
       ),
@@ -44,16 +114,45 @@ class _CounterViewState extends State<CounterView> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
             FloatingActionButton(
-                onPressed: () => setState(() => _controller.increment()),
-                child: const Icon(Icons.add),
+              onPressed: () => setState(() => _controller.increment()),
+              backgroundColor: Colors.green,
+              child: const Icon(Icons.add),
             ),
+            const SizedBox(width: 10),
             FloatingActionButton(
-                onPressed: () => setState(() => _controller.decrement()),
-                child: const Icon(Icons.remove),
+              onPressed: () => setState(() => _controller.decrement()),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.remove),
             ),
+            const SizedBox(width: 10),
             FloatingActionButton(
-                onPressed: () => setState(() => _controller.reset()),
-                child: const Icon(Icons.refresh),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Konfirmasi Reset"),
+                    content: const Text("Apakah kamu yakin ingin mereset counter?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Batal"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _controller.reset());
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Counter berhasil di-reset")),
+                          );
+                        },
+                        child: const Text("Ya, Reset"),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.refresh),
             ),
         ],
       ),

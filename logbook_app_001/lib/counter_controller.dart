@@ -15,7 +15,7 @@ class CounterController {
 
   void increment(){
     _counter += _step;
-    _addHistory("increment → $_counter"); 
+    _addHistory("Increment → $_counter"); 
   }
 
   void decrement() { 
@@ -31,7 +31,7 @@ class CounterController {
 
   void _addHistory(String action) { 
     _history.add(action); 
-    if (_history.length > 5) { 
+    if (_history.length > 5) {  
       _history.removeAt(0); // buang catatan terlama 
     } 
   }
