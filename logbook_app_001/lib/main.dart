@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'counter_view.dart';
+import 'package:logbook_app_001/features/auth/login_view.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const CounterView(),
+      home: const LoginView(),
     );
   }
 }
