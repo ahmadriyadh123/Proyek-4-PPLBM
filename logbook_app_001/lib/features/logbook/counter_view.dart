@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'counter_controller.dart';
 import '../onboarding/onboarding_view.dart';
+import 'log_view.dart';
 
 class CounterView extends StatefulWidget {
   final String username;
@@ -45,6 +46,16 @@ class _CounterViewState extends State<CounterView> {
       appBar: AppBar(
         title: Text("LogBook: ${widget.username}"),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.book),
+            tooltip: 'Daily Logger',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => LogView(username: widget.username)),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {

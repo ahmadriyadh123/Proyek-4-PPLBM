@@ -11,9 +11,9 @@ class AuthResult {
 class LoginController {
   // Database sederhana (Multiple Users)
   final Map<String, String> _users = {
-    'admin': '123',
-    'student': 'pass',
-    'student1': 'password'
+    'admin1': '123',
+    'admin2': 'pass',
+    'admin3': 'password'
   };
 
   int _failedAttempts = 0;
