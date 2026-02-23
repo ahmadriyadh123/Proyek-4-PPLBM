@@ -25,10 +25,10 @@ class _LoginViewState extends State<LoginView> {
     String pass = _passController.text;
 
     // Panggil logika login dari controller
-    String? errorMessage = _controller.login(user, pass);
+    AuthResult result = _controller.login(user, pass);
 
-    if (errorMessage == null) {
-      // Login Berhasil (errorMessage null)
+    if (result.status == LoginStatus.success) {
+      // Login Berhasil
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -37,11 +37,29 @@ class _LoginViewState extends State<LoginView> {
         ),
       );
     } else {
-      // Login Gagal -> Tampilkan pesan error dari controller
+      // Login Gagal -> Tentukan warna dan pesan
+      Color snackColor = Colors.red;
+      IconData icon = Icons.error_outline;
+
+      if (result.status == LoginStatus.emptyInput) {
+        snackColor = Colors.orange; // Warna peringatan
+        icon = Icons.warning_amber_rounded;
+      } 
+      
+      // Sembunyikan snackbar sebelumnya jika ada, agar yang baru langsung muncul
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(result.message ?? "Terjadi kesalahan")),
+            ],
+          ),
+          backgroundColor: snackColor,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       

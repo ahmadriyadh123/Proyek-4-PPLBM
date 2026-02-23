@@ -1,4 +1,13 @@
 // login_controller.dart
+enum LoginStatus { success, emptyInput, invalidCredentials, locked }
+
+class AuthResult {
+  final LoginStatus status;
+  final String? message;
+
+  AuthResult({required this.status, this.message});
+}
+
 class LoginController {
   // Database sederhana (Multiple Users)
   final Map<String, String> _users = {
@@ -11,18 +20,24 @@ class LoginController {
   DateTime? _lockoutTime;
 
   // Fungsi pengecekan
-  // Mengembalikan pesan error jika gagal, atau null jika berhasil
-  String? login(String username, String password) {
+  // Mengembalikan AuthResult
+  AuthResult login(String username, String password) {
     // 1. Validasi Input Kosong
     if (username.isEmpty || password.isEmpty) {
-      return "Username dan Password tidak boleh kosong!";
+      return AuthResult(
+        status: LoginStatus.emptyInput,
+        message: "Username dan Password tidak boleh kosong!",
+      );
     }
 
     // 2. Cek Lockout
     if (_lockoutTime != null) {
       final difference = DateTime.now().difference(_lockoutTime!);
       if (difference.inSeconds < 10) {
-        return "Akun terkunci. Coba lagi dalam ${10 - difference.inSeconds} detik.";
+        return AuthResult(
+          status: LoginStatus.locked,
+          message: "Akun terkunci. Coba lagi dalam ${10 - difference.inSeconds} detik.",
+        );
       } else {
         // Reset lockout jika sudah lewat 10 detik
         _lockoutTime = null;
@@ -34,15 +49,21 @@ class LoginController {
     if (_users.containsKey(username) && _users[username] == password) {
       // Login Berhasil -> Reset percobaan gagal
       _failedAttempts = 0;
-      return null;
+      return AuthResult(status: LoginStatus.success);
     } else {
       // Login Gagal
       _failedAttempts++;
       if (_failedAttempts >= 3) {
         _lockoutTime = DateTime.now();
-        return "Gagal 3 kali. Akun terkunci selama 10 detik.";
+        return AuthResult(
+          status: LoginStatus.locked,
+          message: "Gagal 3 kali. Akun terkunci selama 10 detik.",
+        );
       }
-      return "Username atau Password salah!";
+      return AuthResult(
+        status: LoginStatus.invalidCredentials,
+        message: "Username atau Password salah!",
+      );
     }
   }
 

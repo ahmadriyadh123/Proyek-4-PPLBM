@@ -77,6 +77,23 @@ class _OnboardingViewState extends State<OnboardingView> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 20),
+
+              // Page Indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (index) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: step == index + 1 ? 12 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: step == index + 1 ? Colors.blueAccent : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 20),
               
               // Dynamic Content
               Text(

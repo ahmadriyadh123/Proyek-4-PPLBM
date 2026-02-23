@@ -15,6 +15,19 @@ class CounterView extends StatefulWidget {
 class _CounterViewState extends State<CounterView> {
   final CounterController _controller = CounterController();
 
+  String _getGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 11) {
+      return 'Selamat Pagi';
+    } else if (hour >= 11 && hour < 15) {
+      return 'Selamat Siang';
+    } else if (hour >= 15 && hour < 18) {
+      return 'Selamat Sore';
+    } else {
+      return 'Selamat Malam';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -22,7 +35,7 @@ class _CounterViewState extends State<CounterView> {
   }
 
   void _loadData() async {
-    await _controller.loadData();
+    await _controller.loadData(widget.username);
     setState(() {}); // Refresh UI setelah data dimuat
   }
 
@@ -76,6 +89,44 @@ class _CounterViewState extends State<CounterView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Welcome Banner
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                   Icon(
+                    DateTime.now().hour >= 18 || DateTime.now().hour < 6 
+                        ? Icons.nightlight_round 
+                        : Icons.wb_sunny,
+                    color: Colors.orange,
+                    size: 40,
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getGreeting(), // Panggil fungsi greeting
+                          style: TextStyle(fontSize: 16, color: Colors.grey[700]), 
+                        ),
+                        Text(
+                          widget.username,
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Counter Display Card
             Card(
               elevation: 4,

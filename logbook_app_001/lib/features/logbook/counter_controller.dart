@@ -16,43 +16,43 @@ class CounterController {
   }
 
   // Load data dari storage
-  Future<void> loadData() async {
+  Future<void> loadData(String username) async {
     final prefs = await SharedPreferences.getInstance();
-    _counter = prefs.getInt('counter_value') ?? 0;
-    _history = prefs.getStringList('counter_history') ?? [];
+    _counter = prefs.getInt('counter_value_$username') ?? 0;
+    _history = prefs.getStringList('counter_history_$username') ?? [];
     
     // Potong history jika lebih dari 5 (dari sesi sebelumnya)
     if (_history.length > 5) {
       _history = _history.sublist(0, 5);
-      await _saveData();
+      await _saveData(username);
     }
   }
 
   // Simpan data ke storage
-  Future<void> _saveData() async {
+  Future<void> _saveData(String username) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('counter_value', _counter);
-    await prefs.setStringList('counter_history', _history);
+    await prefs.setInt('counter_value_$username', _counter);
+    await prefs.setStringList('counter_history_$username', _history);
   }
 
   void increment(String username) {
     _counter += _step;
     _addHistory(username, "menambah +$_step", _counter);
-    _saveData();
+    _saveData(username);
   }
 
   void decrement(String username) {
     if (_counter - _step >= 0) {
       _counter -= _step;
       _addHistory(username, "mengurangi -$_step", _counter);
-      _saveData();
+      _saveData(username);
     }
   }
 
   void reset(String username) {
     _counter = 0;
     _addHistory(username, "melakukan Reset", _counter);
-    _saveData();
+    _saveData(username);
   }
 
   void _addHistory(String username, String action, int finalValue) {
