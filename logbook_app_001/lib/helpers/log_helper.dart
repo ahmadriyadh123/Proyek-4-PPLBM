@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:path_provider/path_provider.dart';
 
 class LogHelper {
   static Future<void> writeLog(
@@ -42,9 +43,16 @@ class LogHelper {
   static Future<void> _writeToFile(String logLine) async {
     try {
       final String dateString = DateFormat('dd-MM-yyyy').format(DateTime.now());
-      
-      // Menggunakan folder 'logs' di root project (Ekspektasi Windows/Desktop)
-      final Directory logDir = Directory('logs');
+      Directory logDir;
+
+      // 1. CEK PLATFORM: Hibrida agar bisa jalan di Windows DAN HP
+      if (Platform.isAndroid || Platform.isIOS) {
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        logDir = Directory('${appDocDir.path}/logs');
+      } else {
+        // Ekspektasi default untuk Desktop/Windows (sejajar dengan pubspec.yaml)
+        logDir = Directory('logs'); 
+      }
       
       if (!await logDir.exists()) {
         await logDir.create(recursive: true);
@@ -52,6 +60,10 @@ class LogHelper {
 
       final File logFile = File('${logDir.path}/$dateString.log');
       await logFile.writeAsString('$logLine\n', mode: FileMode.append);
+
+      if (await logFile.length() < 100) {
+        dev.log("INFO: File Log TERSIMPAN di: ${logFile.path}", name: "SYSTEM");
+      }
     } catch (e) {
       dev.log("Gagal menulis ke file log fisik: $e", name: "SYSTEM", level: 1000);
     }

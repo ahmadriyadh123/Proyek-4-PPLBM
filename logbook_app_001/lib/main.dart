@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:logbook_app_001/features/onboarding/onboarding_view.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import 'package:intl/date_symbol_data_local.dart';
 void main() async   {
   WidgetsFlutterBinding.ensureInitialized();
   //Load env
   await dotenv.load(fileName: ".env");
+  // Inisialisasi format tanggal (inti) untuk bahasa Indonesia
+  await initializeDateFormatting('id_ID', null);
   runApp(const MyApp());
 }
 

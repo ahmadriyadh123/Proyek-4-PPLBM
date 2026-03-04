@@ -28,10 +28,11 @@ class _LogViewState extends State<LogView> {
     _refreshLogs();
   }
 
-  void _refreshLogs() {
+  Future<void> _refreshLogs() async {
     setState(() {
       _logsFuture = MongoService().getLogs();
     });
+    await _logsFuture;
   }
 
   @override
@@ -173,7 +174,20 @@ class _LogViewState extends State<LogView> {
   String _formatTimestamp(String timestamp) {
     try {
       final dateTime = DateTime.parse(timestamp);
-      return DateFormat('dd MMM yyyy, HH:mm').format(dateTime);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+
+      if (difference.inMinutes < 1) {
+        return "Baru saja";
+      } else if (difference.inMinutes < 60) {
+        return "${difference.inMinutes} menit yang lalu";
+      } else if (difference.inHours < 24) {
+        return "${difference.inHours} jam yang lalu";
+      } else if (difference.inDays < 7) {
+        return "${difference.inDays} hari yang lalu";
+      } else {
+        return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dateTime);
+      }
     } catch (e) {
       return timestamp;
     }
@@ -250,7 +264,24 @@ class _LogViewState extends State<LogView> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}"));
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.wifi_off, size: 64, color: Colors.blueGrey),
+                        const SizedBox(height: 16),
+                        const Text("Offline Mode Warning", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                        const SizedBox(height: 8),
+                        const Text("Gagal menghubungi server MongoDB.\nPeriksa sinyal atau IP Whitelist Anda.", textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _refreshLogs, 
+                          icon: const Icon(Icons.refresh), 
+                          label: const Text("Coba Lagi")
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
                 final rawLogs = snapshot.data ?? [];
@@ -277,8 +308,11 @@ class _LogViewState extends State<LogView> {
                   );
                 }
 
-                return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                return RefreshIndicator(
+                  onRefresh: _refreshLogs,
+                  child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                       itemCount: currentLogs.length,
                       itemBuilder: (context, index) {
                         final log = currentLogs[index];
@@ -402,7 +436,8 @@ class _LogViewState extends State<LogView> {
                           ),
                         );
                       },
-                    );
+                    ),
+                  );
                   },
                 ),
               ),

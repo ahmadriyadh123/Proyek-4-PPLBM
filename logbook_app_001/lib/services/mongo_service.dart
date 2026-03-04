@@ -82,7 +82,8 @@ class MongoService {
         source: _source,
         level: 1,
       );
-      return [];
+      // PENTING: Lemparkan error agar ditangkap oleh FutureBuilder di UI
+      throw Exception("Gagal terhubung ke Cloud: $e");
     }
   }
 
