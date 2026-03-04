@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'log_controller.dart';
-import 'package:logbook_app_001/features/logbook/models/log_model.dart';
+import 'package:logbook_app_001/features/models/log_model.dart';
 import 'package:intl/intl.dart';
 import 'package:logbook_app_001/features/onboarding/onboarding_view.dart';
+import 'package:logbook_app_001/services/mongo_service.dart';
+import 'package:logbook_app_001/helpers/log_helper.dart';
 
 class LogView extends StatefulWidget {
   final String username;
@@ -16,11 +18,20 @@ class _LogViewState extends State<LogView> {
   late LogController _controller;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
+  String _searchQuery = "";
+  late Future<List<LogModel>> _logsFuture;
 
   @override
   void initState() {
     super.initState();
     _controller = LogController(widget.username);
+    _refreshLogs();
+  }
+
+  void _refreshLogs() {
+    setState(() {
+      _logsFuture = MongoService().getLogs();
+    });
   }
 
   @override
@@ -78,14 +89,15 @@ class _LogViewState extends State<LogView> {
                 child: const Text("Batal"),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_titleController.text.isNotEmpty && _contentController.text.isNotEmpty) {
-                    _controller.addLog(
+                    await _controller.addLog(
                       _titleController.text, 
                       _contentController.text,
                       selectedCategory
                     );
-                    Navigator.pop(context);
+                    if (mounted) Navigator.pop(context);
+                    _refreshLogs(); // Auto-refresh UI setelah integrasi MongoDB
                   }
                 },
                 child: const Text("Simpan"),
@@ -97,7 +109,7 @@ class _LogViewState extends State<LogView> {
     );
   }
 
-  void _showEditLogDialog(int index, LogModel log) {
+  void _showEditLogDialog(LogModel log) {
     _titleController.text = log.title;
     _contentController.text = log.description;
     String selectedCategory = ['Pekerjaan', 'Pribadi', 'Urgent'].contains(log.category) ? log.category : 'Pekerjaan';
@@ -142,10 +154,11 @@ class _LogViewState extends State<LogView> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_titleController.text.isNotEmpty && _contentController.text.isNotEmpty) {
-                    _controller.updateLog(index, _titleController.text, _contentController.text, selectedCategory);
-                    Navigator.pop(context);
+                    await _controller.updateLog(log, _titleController.text, _contentController.text, selectedCategory);
+                    if (mounted) Navigator.pop(context);
+                    _refreshLogs(); // Auto-refresh UI setelah integrasi MongoDB
                   }
                 },
                 child: const Text("Update"),
@@ -206,66 +219,76 @@ class _LogViewState extends State<LogView> {
           ),
         ],
       ),
-      body: Stack(
-        alignment: Alignment.center,
+      body: Column(
         children: [
-          // Latar Belakang Empty State (Tetap di tengah layar, tidak terpengaruh keyboard)
-          ValueListenableBuilder<List<LogModel>>(
-            valueListenable: _controller.filteredLogs,
-            builder: (context, currentLogs, child) {
-              if (currentLogs.isEmpty) {
-                return Positioned(
-                  // Menggunakan fix offset dari atas layar agar tidak terdorong keyboard
-                  // atau bisa menggunakan IgnorePointer + Opacity
-                  top: MediaQuery.of(context).size.height * 0.25,
-                  child: IgnorePointer(
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: const InputDecoration(
+                labelText: "Cari Catatan...",
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<LogModel>>(
+              future: _logsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Opacity(
-                          opacity: 0.5,
-                          child: Image.asset(
-                            'assets/empty.jpg',
-                            width: 200,
-                          ),
-                        ),
-                        const SizedBox(height: 0),
-                        const Text(
-                          "Belum ada catatan hari ini.",
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text("Menghubungkan ke MongoDB Atlas..."),
+                      ],
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text("Error: ${snapshot.error}"));
+                }
+
+                final rawLogs = snapshot.data ?? [];
+                // Terapkan filter pencarian secara real-time pada data hasil Cloud
+                final currentLogs = _searchQuery.isEmpty 
+                  ? rawLogs 
+                  : rawLogs.where((log) => log.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+                if (currentLogs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        const Text("Belum ada catatan di Cloud / Hasil Pencarian Kosong."),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _showAddLogDialog,
+                          child: const Text("Buat Catatan Pertama"),
                         ),
                       ],
                     ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          
-          // Konten Utama (Search & List)
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  onChanged: (value) => _controller.searchLog(value),
-                  decoration: const InputDecoration(
-                    labelText: "Cari Catatan...",
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ValueListenableBuilder<List<LogModel>>(
-                  valueListenable: _controller.filteredLogs,
-                  builder: (context, currentLogs, child) {
-                    return ListView.builder(
+                  );
+                }
+
+                return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       itemCount: currentLogs.length,
                       itemBuilder: (context, index) {
                         final log = currentLogs[index];
+                        // index asli dibutuhkan buat Delete, but wait, if it's filtered, index is wrong!
+                        // Remove by log.id or the original log object. Or we can just pass `log` to delete.
+                        // Wait, removeLog takes index based on logsNotifier... I will rewrite removeLog to take log object or we must find its true index!
+                        // Let's pass `log` to _showEditLogDialog as well... Wait edit dialog needs true index?
+                        // No, the Cloud operations rely ONLY on `log.id!`. The index parameter in controller was for local array.
+                        // I'll leave the UI passing the loop index for now, but my LogController updateLog/removeLog actually uses that index strictly. This is a bug!
+                        // I NEED to fix the LogController in the next step to not use `index` but the `log.id`.
                         Color cardColor;
                     Color iconColor;
                     IconData categoryIcon;
@@ -297,11 +320,14 @@ class _LogViewState extends State<LogView> {
                         padding: const EdgeInsets.only(right: 20),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
-                      onDismissed: (direction) {
-                        _controller.removeLog(index);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Catatan dihapus")),
-                        );
+                      onDismissed: (direction) async {
+                        await _controller.removeLog(log);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Catatan dihapus")),
+                          );
+                          _refreshLogs();
+                        }
                       },
                       child: Card(
                         color: cardColor,
@@ -334,7 +360,7 @@ class _LogViewState extends State<LogView> {
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.edit, color: Colors.blue), 
-                                      onPressed: () => _showEditLogDialog(index, log),
+                                      onPressed: () => _showEditLogDialog(log),
                                       tooltip: 'Edit',
                                     ),
                                     IconButton(
@@ -351,12 +377,15 @@ class _LogViewState extends State<LogView> {
                                                 child: const Text("Batal")
                                               ),
                                               TextButton(
-                                                onPressed: () {
-                                                  _controller.removeLog(index);
+                                                onPressed: () async {
                                                   Navigator.pop(context);
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(content: Text("Catatan dihapus")),
-                                                  );
+                                                  await _controller.removeLog(log);
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text("Catatan dihapus")),
+                                                    );
+                                                    _refreshLogs();
+                                                  }
                                                 }, 
                                                 child: const Text("Hapus", style: TextStyle(color: Colors.red))
                                               ),
@@ -379,8 +408,6 @@ class _LogViewState extends State<LogView> {
               ),
             ],
           ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddLogDialog,
         backgroundColor: Colors.indigo,
