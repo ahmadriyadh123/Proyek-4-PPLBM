@@ -4,6 +4,7 @@ import 'package:logbook_app_001/services/mongo_service.dart';
 import 'package:logbook_app_001/helpers/log_helper.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logbook_app_001/services/access_policy.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 
 class LogController {
   final Box<LogModel> _offlineLogsBox = Hive.box<LogModel>('offline_logs');
@@ -14,6 +15,14 @@ class LogController {
   final String role;
 
   LogController(this.username, this.teamId, this.role);
+
+  int _findLogIndex(LogModel target) {
+    return _offlineLogsBox.values.toList().indexWhere(
+      (l) =>
+          (target.id != null && l.id != null && l.id == target.id) ||
+          l.timestamp == target.timestamp,
+    );
+  }
 
   Future<void> addLog(
     String title,
@@ -54,22 +63,28 @@ class LogController {
     filteredLogs.value = localLogs;
 
     try {
-      if (newLog.id != null) {
-        // Assume ObjectId will be generated locally first time via toMap()
-      }
-      await MongoService().insertLog(newLog);
+      final ObjectId insertedId = await MongoService().insertLog(newLog);
       await LogHelper.writeLog(
         "SINKRONISASI CLOUD BERHASIL: Catatan '${newLog.title}' tersimpan di MongoDB.",
         level: 2,
       );
 
       // Update local storage again to set isSynced = true
-      final index = _offlineLogsBox.values.toList().indexWhere(
-        (l) => l.timestamp == newLog.timestamp,
-      );
+      final index = _findLogIndex(newLog);
       if (index != -1) {
-        newLog.isSynced = true;
-        await _offlineLogsBox.putAt(index, newLog);
+        final syncedLog = LogModel(
+          id: insertedId,
+          title: newLog.title,
+          description: newLog.description,
+          timestamp: newLog.timestamp,
+          category: newLog.category,
+          teamId: newLog.teamId,
+          authorId: newLog.authorId,
+          isSynced: true,
+          isPrivate: newLog.isPrivate,
+          isDeleted: newLog.isDeleted,
+        );
+        await _offlineLogsBox.putAt(index, syncedLog);
 
         // Memastikan UI menggunakan objek yang sudah tersinkronisasi
         final updatedLocal = _offlineLogsBox.values
@@ -273,7 +288,19 @@ class LogController {
         }
 
         if (log.id == null) {
-          await MongoService().insertLog(log);
+          final insertedId = await MongoService().insertLog(log);
+          log = LogModel(
+            id: insertedId,
+            title: log.title,
+            description: log.description,
+            timestamp: log.timestamp,
+            category: log.category,
+            teamId: log.teamId,
+            authorId: log.authorId,
+            isSynced: log.isSynced,
+            isPrivate: log.isPrivate,
+            isDeleted: log.isDeleted,
+          );
           await LogHelper.writeLog(
             "=> Mendorong Draft Offline ke Cloud: ${log.title}",
             level: 2,
@@ -287,7 +314,19 @@ class LogController {
               level: 2,
             );
           } else {
-            await MongoService().insertLog(log);
+            final insertedId = await MongoService().insertLog(log);
+            log = LogModel(
+              id: insertedId,
+              title: log.title,
+              description: log.description,
+              timestamp: log.timestamp,
+              category: log.category,
+              teamId: log.teamId,
+              authorId: log.authorId,
+              isSynced: log.isSynced,
+              isPrivate: log.isPrivate,
+              isDeleted: log.isDeleted,
+            );
             await LogHelper.writeLog(
               "=> Mendorong Draft Lama ke Cloud: ${log.title}",
               level: 2,
@@ -378,8 +417,16 @@ class LogController {
             .isEmpty; // Tampilkan hanya bila id awan tidak disandi nisan lokal
       }).toList();
 
-      // Gabungkan cloudLogs bersih dan pendingLogs hidup
-      final combinedLogs = [...filteredCloudLogs, ...pendingLogs];
+      // Gabungkan cloud + pending dengan deduplikasi berdasarkan id/timestamp.
+      final merged = <String, LogModel>{};
+      String identity(LogModel l) => l.id?.toHexString() ?? 'ts:${l.timestamp}';
+      for (final log in filteredCloudLogs) {
+        merged[identity(log)] = log;
+      }
+      for (final log in pendingLogs) {
+        merged[identity(log)] = log;
+      }
+      final combinedLogs = merged.values.toList();
 
       // Update UI dengan data gabungan
       logsNotifier.value = combinedLogs;
@@ -390,14 +437,29 @@ class LogController {
         log.isSynced = true;
       }
 
-      // Ambil semua pending bawaan (termasuk tim lain jika ada) untuk di pass ke Hive
-      final allPending = _offlineLogsBox.values
-          .where((log) => !log.isSynced)
-          .toList();
+      // Upsert cloud ke Hive tanpa clear() agar tombstone lokal tidak hilang.
+      for (final cloudLog in cloudLogs) {
+        final index = _offlineLogsBox.values.toList().indexWhere(
+          (local) =>
+              (cloudLog.id != null &&
+                  local.id != null &&
+                  local.id == cloudLog.id) ||
+              local.timestamp == cloudLog.timestamp,
+        );
 
-      await _offlineLogsBox.clear();
-      await _offlineLogsBox.addAll(cloudLogs);
-      await _offlineLogsBox.addAll(allPending);
+        if (index == -1) {
+          await _offlineLogsBox.add(cloudLog);
+          continue;
+        }
+
+        final local = _offlineLogsBox.getAt(index);
+        if (local != null && local.isDeleted && !local.isSynced) {
+          // Pertahankan tombstone lokal yang belum tersinkron.
+          continue;
+        }
+
+        await _offlineLogsBox.putAt(index, cloudLog);
+      }
     } catch (e) {
       // Gagal ambil Cloud (Offline), tetap gunakan `localLogs`
       await LogHelper.writeLog(

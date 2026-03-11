@@ -9,6 +9,8 @@ class MongoService {
   // Menggunakan nullable agar kita bisa mengecek status inisialisasi
   Db? _db;
   DbCollection? _collection;
+  bool _isConnecting = false;
+  Future<void>? _connectFuture;
 
   final String _source = "mongo_service.dart";
 
@@ -30,6 +32,27 @@ class MongoService {
 
   /// Inisialisasi Koneksi ke MongoDB Atlas
   Future<void> connect() async {
+    if (_db != null && _db!.isConnected && _collection != null) {
+      return;
+    }
+
+    if (_isConnecting && _connectFuture != null) {
+      await _connectFuture;
+      return;
+    }
+
+    _isConnecting = true;
+    _connectFuture = _openConnection();
+
+    try {
+      await _connectFuture;
+    } finally {
+      _isConnecting = false;
+      _connectFuture = null;
+    }
+  }
+
+  Future<void> _openConnection() async {
     try {
       final dbUri = dotenv.env['MONGODB_URI'];
       if (dbUri == null) throw Exception("MONGODB_URI tidak ditemukan di .env");
@@ -101,16 +124,21 @@ class MongoService {
   }
 
   /// CREATE: Menambahkan data baru
-  Future<void> insertLog(LogModel log) async {
+  Future<ObjectId> insertLog(LogModel log) async {
     try {
       final collection = await _getSafeCollection();
-      await collection.insertOne(log.toMap());
+      final payload = log.toMap();
+      final result = await collection.insertOne(payload);
+      final insertedId = result.id is ObjectId
+          ? result.id as ObjectId
+          : payload['_id'] as ObjectId;
 
       await LogHelper.writeLog(
         "SUCCESS: Data '${log.title}' Saved to Cloud",
         source: _source,
         level: 2,
       );
+      return insertedId;
     } catch (e) {
       await LogHelper.writeLog(
         "ERROR: Insert Failed - $e",

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:logbook_app_001/features/onboarding/onboarding_view.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -9,8 +10,10 @@ void main() async {
   // Wajib untuk operasi async sebelum runApp, seperti load env dan inisialisasi Hive
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Matikan debug bawaan terminal dari Flutter
-  debugPrint = (String? message, {int? wrapWidth}) {};
+  // Matikan debug print hanya saat release agar proses debugging tetap mudah.
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
 
   //Load env
   await dotenv.load(fileName: ".env");

@@ -287,7 +287,7 @@ class _LogViewState extends State<LogView> {
                           break;
                       }
 
-                      Widget cardLayout = Card(
+                      final Widget cardLayout = Card(
                         color: cardColor,
                         elevation: 2,
                         margin: const EdgeInsets.only(bottom: 12),
@@ -331,104 +331,111 @@ class _LogViewState extends State<LogView> {
                                   ],
                                 ),
                                 isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (canEdit || canDelete)
-                                  ...[
-                                    if (canEdit)
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue), 
-                                        onPressed: () => _navigateToEditLog(log),
-                                        tooltip: 'Edit',
-                                      ),
-                                    if (canDelete)
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red), 
-                                        onPressed: () {
-                                          if (!mounted) return;
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text("Hapus Catatan"),
-                                              content: const Text("Yakin ingin menghapus catatan ini?"),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context), 
-                                                  child: const Text("Batal")
-                                                ),
-                                                TextButton(
-                                                  onPressed: () async {
-                                                    final navigator = Navigator.of(context);
-                                                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                                                    
-                                                    navigator.pop();
-                                                    await _controller.removeLog(log, widget.role);
-                                                    if (mounted) {
-                                                      scaffoldMessenger.showSnackBar(
-                                                        const SnackBar(content: Text("Catatan dihapus")),
-                                                      );
-                                                      _refreshLogs();
-                                                    }
-                                                  }, 
-                                                  child: const Text("Hapus", style: TextStyle(color: Colors.red))
-                                                ),
-                                              ],
-                                            )
-                                          );
-                                        },
-                                        tooltip: 'Hapus',
-                                      ),
-                                  ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12.0, bottom: 8.0, right: 12.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                log.isSynced ? Icons.cloud_done : Icons.cloud_off,
-                                color: log.isSynced ? Colors.green : Colors.red,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                log.isSynced ? "Tersinkronisasi" : "Menunggu jaringan...",
-                                style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (canEdit || canDelete)
+                                      ...[
+                                        if (canEdit)
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, color: Colors.blue),
+                                            onPressed: () => _navigateToEditLog(log),
+                                            tooltip: 'Edit',
+                                          ),
+                                        if (canDelete)
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            onPressed: () {
+                                              if (!mounted) return;
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text("Hapus Catatan"),
+                                                  content: const Text("Yakin ingin menghapus catatan ini?"),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(context),
+                                                      child: const Text("Batal"),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () async {
+                                                        final navigator = Navigator.of(context);
+                                                        final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-                      if (canDelete) {
-                        return Dismissible(
-                          key: Key(log.timestamp), // Gunakan identitas unik (timestamp)
-                          direction: DismissDirection.endToStart, // Swipe dari kanan ke kiri
-                          background: Container(
-                            color: Colors.red,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
-                          ),
-                          onDismissed: (direction) async {
-                            await _controller.removeLog(log, widget.role);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Catatan dihapus")),
-                              );
-                              _refreshLogs();
-                            }
-                          },
-                          child: cardLayout,
-                        );
-                      } else {
-                        return cardLayout;
-                      }
+                                                        navigator.pop();
+                                                        await _controller.removeLog(log, widget.role);
+                                                        if (mounted) {
+                                                          scaffoldMessenger.showSnackBar(
+                                                            const SnackBar(content: Text("Catatan dihapus")),
+                                                          );
+                                                          _refreshLogs();
+                                                        }
+                                                      },
+                                                      child: const Text(
+                                                        "Hapus",
+                                                        style: TextStyle(color: Colors.red),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                            tooltip: 'Hapus',
+                                          ),
+                                      ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12.0, bottom: 8.0, right: 12.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    log.isSynced ? Icons.cloud_done : Icons.cloud_off,
+                                    color: log.isSynced ? Colors.green : Colors.red,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    log.isSynced ? "Tersinkronisasi" : "Menunggu jaringan...",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      final Widget item = canDelete
+                          ? Dismissible(
+                              key: Key(log.id?.toHexString() ?? log.timestamp),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                color: Colors.red,
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                child: const Icon(Icons.delete, color: Colors.white),
+                              ),
+                              onDismissed: (direction) async {
+                                await _controller.removeLog(log, widget.role);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("Catatan dihapus")),
+                                  );
+                                  _refreshLogs();
+                                }
+                              },
+                              child: cardLayout,
+                            )
+                          : cardLayout;
+
+                      return item;
                     },
                   ),
                 );
