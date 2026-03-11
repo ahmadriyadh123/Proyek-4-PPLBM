@@ -63,18 +63,31 @@ class MongoService {
     }
   }
 
-  /// READ: Mengambil data dari Cloud
-  Future<List<LogModel>> getLogs() async {
+  /// READ: Mengambil data dari Cloud (Berdasarkan Team, Privasi, dan Role)
+  Future<List<LogModel>> getLogs(String userTeamId, String currentUsername, String role) async {
     try {
       final collection = await _getSafeCollection(); // Gunakan jalur aman
 
       await LogHelper.writeLog(
-        "INFO: Fetching data from Cloud...",
+        "INFO: Fetching data from Cloud for Team $userTeamId...",
         source: _source,
         level: 3,
       );
 
-      final List<Map<String, dynamic>> data = await collection.find().toList();
+      // Task 5: Data Privacy & Sovereignty
+      // Fetch dokumen khusus tim ini YANG (Publik ATAU milik Username ini)
+      SelectorBuilder query;
+      if (role == 'Ketua') {
+        // Ketua bisa melihat catatannya sendiri ATAU catatan tim yang Public
+        query = where.eq('teamId', userTeamId).and(
+          where.eq('isPrivate', false).or(where.eq('authorId', currentUsername))
+        );
+      } else {
+        // Selain Ketua HANYA bisa melihat catatannya sendiri
+        query = where.eq('teamId', userTeamId).and(where.eq('authorId', currentUsername));
+      }
+
+      final List<Map<String, dynamic>> data = await collection.find(query).toList();
       return data.map((json) => LogModel.fromMap(json)).toList();
     } catch (e) {
       await LogHelper.writeLog(
@@ -112,8 +125,9 @@ class MongoService {
   Future<void> updateLog(LogModel log) async {
     try {
       final collection = await _getSafeCollection();
-      if (log.id == null)
+      if (log.id == null) {
         throw Exception("ID Log tidak ditemukan untuk update");
+      }
 
       await collection.replaceOne(where.id(log.id!), log.toMap());
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
@@ -29,6 +28,8 @@ class LogHelper {
       dev.log(message, name: source, time: DateTime.now(), level: level * 100);
 
       // Format: [14:30:05] [INFO] [log_view.dart] -> Database Terhubung
+      // Menggunakan print() murni kita sendiri karena debugPrint bawaan flutter sudah dimatikan
+      // ignore: avoid_print
       print('$color[$timestamp][$label][$source] -> $message\x1B[0m');
 
       // 5. Tulis ke File Fisik (Audit Trail)

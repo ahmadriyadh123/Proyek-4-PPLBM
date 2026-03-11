@@ -32,8 +32,12 @@ class _LoginViewState extends State<LoginView> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          // Di sini kita kirimkan variabel 'user' ke parameter 'username' di LogView
-          builder: (context) => LogView(username: user),
+          // Di sini kita kirimkan variabel 'user', 'role', dan 'teamId' ke parameter di LogView
+          builder: (context) => LogView(
+            username: user,
+            role: result.role!,
+            teamId: result.teamId!
+          ),
         ),
       );
     } else {

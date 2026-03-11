@@ -52,7 +52,11 @@ class _CounterViewState extends State<CounterView> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => LogView(username: widget.username)),
+                MaterialPageRoute(builder: (context) => LogView(
+                  username: widget.username, 
+                  role: 'Anggota', 
+                  teamId: 'KLP_DEFAULT'
+                )),
               );
             },
           ),

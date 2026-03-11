@@ -4,16 +4,18 @@ enum LoginStatus { success, emptyInput, invalidCredentials, locked }
 class AuthResult {
   final LoginStatus status;
   final String? message;
+  final String? role; 
+  final String? teamId;
 
-  AuthResult({required this.status, this.message});
+  AuthResult({required this.status, this.message, this.role, this.teamId});
 }
 
 class LoginController {
   // Database sederhana (Multiple Users)
-  final Map<String, String> _users = {
-    'admin1': '123',
-    'admin2': 'pass',
-    'admin3': 'password'
+  final Map<String, Map<String, String>> _users = {
+    'admin1': {'pass': '123', 'role': 'Ketua', 'teamId': 'MEKTRA_KLP_01'},
+    'admin2': {'pass': 'pass', 'role': 'Anggota', 'teamId': 'MEKTRA_KLP_01'},
+    'admin3': {'pass': 'password', 'role': 'Ketua', 'teamId': 'MEKTRA_KLP_02'},
   };
 
   int _failedAttempts = 0;
@@ -46,10 +48,14 @@ class LoginController {
     }
 
     // 3. Cek Kredensial
-    if (_users.containsKey(username) && _users[username] == password) {
+    if (_users.containsKey(username) && _users[username]!['pass'] == password) {
       // Login Berhasil -> Reset percobaan gagal
       _failedAttempts = 0;
-      return AuthResult(status: LoginStatus.success);
+      return AuthResult(
+        status: LoginStatus.success,
+        role: _users[username]!['role'],
+        teamId: _users[username]!['teamId'],
+      );
     } else {
       // Login Gagal
       _failedAttempts++;

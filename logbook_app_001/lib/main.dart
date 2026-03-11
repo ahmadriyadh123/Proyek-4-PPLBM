@@ -2,12 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:logbook_app_001/features/onboarding/onboarding_view.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
-void main() async   {
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:logbook_app_001/features/models/log_model.dart';
+
+void main() async {
+  // Wajib untuk operasi async sebelum runApp, seperti load env dan inisialisasi Hive
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Matikan debug bawaan terminal dari Flutter
+  debugPrint = (String? message, {int? wrapWidth}) {};
+
   //Load env
   await dotenv.load(fileName: ".env");
+
   // Inisialisasi format tanggal (inti) untuk bahasa Indonesia
   await initializeDateFormatting('id_ID', null);
+  
+  // Inisialisasi Hive
+  await Hive.initFlutter();
+  Hive.registerAdapter(LogModelAdapter()); // Generasi otomatis dari hive_generator
+  await Hive.openBox<LogModel>('offline_logs'); // Buka box untuk menyimpan log offline
+  
   runApp(const MyApp());
 }
 
@@ -35,7 +50,7 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const OnboardingView(),
     );
@@ -109,7 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
           // action in the IDE, or press "p" in the console), to see the
           // wireframe for each widget.
-          mainAxisAlignment: .center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('You have pushed the button this many times:'),
             Text(
