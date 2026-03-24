@@ -12,7 +12,7 @@ class LogHelper {
     int level = 2,
   }) async {
     // 1. Filter Konfigurasi (ENV)
-    final int configLevel = int.tryParse(dotenv.env['LOG_LEVEL'] ?? '2') ?? 2;
+    final int configLevel = int.tryParse(dotenv.env['LOG_LEVEL'] ?? '3') ?? 3;
     final String muteList = dotenv.env['LOG_MUTE'] ?? '';
 
     if (level > configLevel) return;

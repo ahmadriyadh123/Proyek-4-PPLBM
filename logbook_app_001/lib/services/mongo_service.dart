@@ -27,6 +27,9 @@ class MongoService {
       );
       await connect();
     }
+    if (_collection == null) {
+      throw Exception("Collection gagal diinisialisasi.");
+    }
     return _collection!;
   }
 
@@ -99,18 +102,24 @@ class MongoService {
 
       // Task 5: Data Privacy & Sovereignty
       // Fetch dokumen khusus tim ini YANG (Publik ATAU milik Username ini)
-      SelectorBuilder query;
+      final Map<String, dynamic> rawQuery = {
+        'teamId': userTeamId,
+      };
+
       if (role == 'Ketua') {
-        // Ketua bisa melihat catatannya sendiri ATAU catatan tim yang Public
-        query = where.eq('teamId', userTeamId).and(
-          where.eq('isPrivate', false).or(where.eq('authorId', currentUsername))
-        );
+        // Ketua bisa melihat catatannya sendiri ATAU catatan tim yang Public (termasuk legacy db yang belum punya isPrivate)
+        rawQuery[r'$or'] = [
+          {'isPrivate': false},
+          {'isPrivate': null}, 
+          {'isPrivate': {r'$exists': false}}, 
+          {'authorId': currentUsername}
+        ];
       } else {
         // Selain Ketua HANYA bisa melihat catatannya sendiri
-        query = where.eq('teamId', userTeamId).and(where.eq('authorId', currentUsername));
+        rawQuery['authorId'] = currentUsername;
       }
 
-      final List<Map<String, dynamic>> data = await collection.find(query).toList();
+      final List<Map<String, dynamic>> data = await collection.find(rawQuery).toList();
       return data.map((json) => LogModel.fromMap(json)).toList();
     } catch (e) {
       await LogHelper.writeLog(
