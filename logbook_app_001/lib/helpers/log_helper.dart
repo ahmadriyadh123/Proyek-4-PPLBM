@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart'; 
+import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -33,7 +33,7 @@ class LogHelper {
       print('$color[$timestamp][$label][$source] -> $message\x1B[0m');
 
       // 5. Tulis ke File Fisik (Audit Trail)
-      if (!kIsWeb) { 
+      if (!kIsWeb) {
         _writeToFile('[$timestamp][$label][$source] -> $message');
       }
     } catch (e) {
@@ -52,9 +52,9 @@ class LogHelper {
         logDir = Directory('${appDocDir.path}/logs');
       } else {
         // Ekspektasi default untuk Desktop/Windows (sejajar dengan pubspec.yaml)
-        logDir = Directory('logs'); 
+        logDir = Directory('logs');
       }
-      
+
       if (!await logDir.exists()) {
         await logDir.create(recursive: true);
       }
@@ -66,7 +66,11 @@ class LogHelper {
         dev.log("INFO: File Log TERSIMPAN di: ${logFile.path}", name: "SYSTEM");
       }
     } catch (e) {
-      dev.log("Gagal menulis ke file log fisik: $e", name: "SYSTEM", level: 1000);
+      dev.log(
+        "Gagal menulis ke file log fisik: $e",
+        name: "SYSTEM",
+        level: 1000,
+      );
     }
   }
 

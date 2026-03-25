@@ -17,11 +17,23 @@ class AccessControlService {
         'Asisten': [actionRead, actionUpdate],
     };
 
-    static bool canPerform(String role, String action, {bool isOwner = false}) {
+    static bool canPerform(String role, String action, {bool isOwner = false, bool isPrivate = false}) {
         if (action == actionUpdate || action == actionDelete) {
-            // Berlakukan Kedaulatan Data (Sovereignty) mutlak untuk Task 5
-            // HANYA pembuat (Owner) yang bisa mengedit/menghapus, mengabaikan peran/role apapun.
-            return isOwner;
+            // Berlakukan Kedaulatan Data mutlak:
+            // Jika catatan di-set Private -> HANYA pembuat (Owner) yang bisa mengedit/menghapus. (Bahkan Ketua tidak bisa)
+            if (isPrivate) {
+                return isOwner;
+            }
+
+            // Jika catatan di-set Public ->
+            // 1. Pembuat (Owner) selalu bisa edit/hapus
+            if (isOwner) {
+                return true;
+            }
+            // 2. Ketua/Admin punya wewenang mengelola (edit/hapus) catatan tim yang publik
+            if (role == 'Ketua' || role == 'Admin') {
+                return true;
+            }
         }
 
         final permissions = rolePermissions[role] ?? [];

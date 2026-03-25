@@ -90,7 +90,11 @@ class MongoService {
   }
 
   /// READ: Mengambil data dari Cloud (Berdasarkan Team, Privasi, dan Role)
-  Future<List<LogModel>> getLogs(String userTeamId, String currentUsername, String role) async {
+  Future<List<LogModel>> getLogs(
+    String userTeamId,
+    String currentUsername,
+    String role,
+  ) async {
     try {
       final collection = await _getSafeCollection(); // Gunakan jalur aman
 
@@ -102,24 +106,26 @@ class MongoService {
 
       // Task 5: Data Privacy & Sovereignty
       // Fetch dokumen khusus tim ini YANG (Publik ATAU milik Username ini)
-      final Map<String, dynamic> rawQuery = {
-        'teamId': userTeamId,
-      };
+      final Map<String, dynamic> rawQuery = {'teamId': userTeamId};
 
       if (role == 'Ketua') {
-        // Ketua bisa melihat catatannya sendiri ATAU catatan tim yang Public (termasuk legacy db yang belum punya isPrivate)
+        // Ketua bisa melihat SEMUA catatan dalam satu tim (Public dan Private miliknya dan milik anggota lain)
+        // Jadi kita tidak menambahkan batas filter di rawQuery selain yang sudah ada (teamId).
+      } else {
+        // Anggota hanya bisa melihat catatannya sendiri (Public/Private) ATAU catatan anggota yang Public
         rawQuery[r'$or'] = [
           {'isPrivate': false},
-          {'isPrivate': null}, 
-          {'isPrivate': {r'$exists': false}}, 
-          {'authorId': currentUsername}
+          {'isPrivate': null},
+          {
+            'isPrivate': {r'$exists': false},
+          },
+          {'authorId': currentUsername},
         ];
-      } else {
-        // Selain Ketua HANYA bisa melihat catatannya sendiri
-        rawQuery['authorId'] = currentUsername;
       }
 
-      final List<Map<String, dynamic>> data = await collection.find(rawQuery).toList();
+      final List<Map<String, dynamic>> data = await collection
+          .find(rawQuery)
+          .toList();
       return data.map((json) => LogModel.fromMap(json)).toList();
     } catch (e) {
       await LogHelper.writeLog(

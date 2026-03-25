@@ -8,15 +8,16 @@ import 'package:logbook_app_001/features/logbook/log_editor_page.dart';
 import 'package:logbook_app_001/services/access_policy.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:lottie/lottie.dart';
+import 'dart:async';
 
 class LogView extends StatefulWidget {
   final String username;
   final String role;
   final String teamId;
   const LogView({
-    super.key, 
-    required this.username, 
-    required this.role, 
+    super.key,
+    required this.username,
+    required this.role,
     required this.teamId,
   });
 
@@ -30,12 +31,23 @@ class _LogViewState extends State<LogView> {
   final TextEditingController _contentController = TextEditingController();
   bool _isLoading = false;
   bool _isOffline = false;
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  bool _wasOffline = false;
 
   @override
   void initState() {
     super.initState();
     _controller = LogController(widget.username, widget.teamId, widget.role);
     _refreshLogs();
+
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      final isNowOffline = results.contains(ConnectivityResult.none) || results.isEmpty;
+      if (!isNowOffline && _wasOffline) {
+        // Otomatis sinkronisasi ketika jaringan internet kembali terhubung
+        _refreshLogs();
+      }
+      _wasOffline = isNowOffline;
+    });
   }
 
   Future<void> _refreshLogs() async {
@@ -71,6 +83,7 @@ class _LogViewState extends State<LogView> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
@@ -89,7 +102,7 @@ class _LogViewState extends State<LogView> {
     _refreshLogs();
   }
 
-  void _navigateToEditLog(LogModel log) async {
+  void _navigateToEditLog(LogModel log, {bool readOnly = false}) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -97,10 +110,11 @@ class _LogViewState extends State<LogView> {
           log: log,
           controller: _controller,
           currentUser: {'uid': widget.username, 'teamId': widget.teamId},
+          readOnly: readOnly,
         ),
       ),
     );
-    _refreshLogs();
+    if (!readOnly) _refreshLogs();
   }
 
   String _formatTimestamp(String timestamp) {
@@ -110,10 +124,11 @@ class _LogViewState extends State<LogView> {
       final difference = now.difference(dateTime);
 
       if (difference.inMinutes < 1) return "Baru saja";
-      if (difference.inMinutes < 60) return "${difference.inMinutes} menit yang lalu";
+      if (difference.inMinutes < 60)
+        return "${difference.inMinutes} menit yang lalu";
       if (difference.inHours < 24) return "${difference.inHours} jam yang lalu";
       if (difference.inDays < 7) return "${difference.inDays} hari yang lalu";
-      
+
       return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dateTime);
     } catch (e) {
       return timestamp;
@@ -128,8 +143,13 @@ class _LogViewState extends State<LogView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("Daily Logger: ${widget.username}"),
-            Text("Tim: ${widget.teamId} | Peran: ${widget.role}", 
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+            Text(
+              "Tim: ${widget.teamId} | Peran: ${widget.role}",
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
           ],
         ),
         backgroundColor: Colors.indigo,
@@ -144,16 +164,24 @@ class _LogViewState extends State<LogView> {
                   title: const Text("Konfirmasi Logout"),
                   content: const Text("Apakah Anda yakin ingin keluar?"),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Batal"),
+                    ),
                     TextButton(
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (context) => const OnboardingView()),
-                          (route) => false, 
+                          MaterialPageRoute(
+                            builder: (context) => const OnboardingView(),
+                          ),
+                          (route) => false,
                         );
                       },
-                      child: const Text("Keluar", style: TextStyle(color: Colors.red)),
+                      child: const Text(
+                        "Keluar",
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                   ],
                 ),
@@ -180,7 +208,9 @@ class _LogViewState extends State<LogView> {
             child: ValueListenableBuilder<List<LogModel>>(
               valueListenable: _controller.filteredLogs,
               builder: (context, currentLogs, child) {
-                final bool isSearchEmpty = _controller.logsNotifier.value.isNotEmpty && currentLogs.isEmpty;
+                final bool isSearchEmpty =
+                    _controller.logsNotifier.value.isNotEmpty &&
+                    currentLogs.isEmpty;
                 Widget content;
 
                 if (_isLoading && _controller.logsNotifier.value.isEmpty) {
@@ -194,18 +224,37 @@ class _LogViewState extends State<LogView> {
                       ],
                     ),
                   );
-                } else if (_isOffline && _controller.logsNotifier.value.isEmpty) {
+                } else if (_isOffline &&
+                    _controller.logsNotifier.value.isEmpty) {
                   content = Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                        const Icon(
+                          Icons.cloud_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 16),
-                        const Text("Offline Mode Warning", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                        const Text(
+                          "Offline Mode Warning",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        const Text("Gagal menghubungi server MongoDB.\nData lokal juga kosong.", textAlign: TextAlign.center),
+                        const Text(
+                          "Gagal menghubungi server MongoDB.\nData lokal juga kosong.",
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: 16),
-                        ElevatedButton.icon(onPressed: _refreshLogs, icon: const Icon(Icons.refresh), label: const Text("Coba Lagi")),
+                        ElevatedButton.icon(
+                          onPressed: _refreshLogs,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text("Coba Lagi"),
+                        ),
                       ],
                     ),
                   );
@@ -216,7 +265,13 @@ class _LogViewState extends State<LogView> {
                       children: [
                         Icon(Icons.search_off, size: 64, color: Colors.grey),
                         SizedBox(height: 16),
-                        Text("Tidak ada catatan yang cocok.", style: TextStyle(fontSize: 16, color: Colors.blueGrey)),
+                        Text(
+                          "Tidak ada catatan yang cocok.",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -227,21 +282,38 @@ class _LogViewState extends State<LogView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (_isOffline)
-                          const Icon(Icons.cloud_off, size: 64, color: Colors.grey)
+                          const Icon(
+                            Icons.cloud_off,
+                            size: 64,
+                            color: Colors.grey,
+                          )
                         else
                           Lottie.network(
                             'https://raw.githubusercontent.com/xvrh/lottie-flutter/master/example/assets/LottieLogo1.json',
                             height: 150,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.inbox, size: 64, color: Colors.grey),
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                                  Icons.inbox,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
                           ),
                         const SizedBox(height: 16),
                         Text(
-                          _isOffline ? "Anda sedang offline. Belum ada catatan lokal." : "Belum ada aktivitas hari ini?\nMulai catat kemajuan proyek Anda!",
+                          _isOffline
+                              ? "Anda sedang offline. Belum ada catatan lokal."
+                              : "Belum ada aktivitas hari ini?\nMulai catat kemajuan proyek Anda!",
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.blueGrey,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        ElevatedButton(onPressed: _navigateToAddLog, child: const Text("Buat Catatan Pertama")),
+                        ElevatedButton(
+                          onPressed: _navigateToAddLog,
+                          child: const Text("Buat Catatan Pertama"),
+                        ),
                       ],
                     ),
                   );
@@ -252,13 +324,23 @@ class _LogViewState extends State<LogView> {
                     itemCount: currentLogs.length,
                     itemBuilder: (context, index) {
                       final log = currentLogs[index];
-                      final bool canEdit = AccessControlService.canPerform(widget.role, AccessControlService.actionUpdate, isOwner: log.authorId == widget.username);
-                      final bool canDelete = AccessControlService.canPerform(widget.role, AccessControlService.actionDelete, isOwner: log.authorId == widget.username);
-                      
+                      final bool canEdit = AccessControlService.canPerform(
+                        widget.role,
+                        AccessControlService.actionUpdate,
+                        isOwner: log.authorId == widget.username,
+                        isPrivate: log.isPrivate,
+                      );
+                      final bool canDelete = AccessControlService.canPerform(
+                        widget.role,
+                        AccessControlService.actionDelete,
+                        isOwner: log.authorId == widget.username,
+                        isPrivate: log.isPrivate,
+                      );
+
                       Color cardColor = Colors.orange.shade50;
                       Color iconColor = Colors.orange;
                       IconData categoryIcon = Icons.computer;
-                      
+
                       switch (log.category) {
                         case 'Mechanical':
                           cardColor = Colors.green.shade50;
@@ -276,20 +358,36 @@ class _LogViewState extends State<LogView> {
                         color: cardColor,
                         elevation: 2,
                         margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ListTile(
+                              onTap: () => _navigateToEditLog(log, readOnly: !canEdit),
                               leading: CircleAvatar(
                                 backgroundColor: iconColor.withOpacity(0.2),
                                 child: Icon(categoryIcon, color: iconColor),
                               ),
                               title: Row(
                                 children: [
-                                  Expanded(child: Text(log.title, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                  if (widget.role == 'Ketua' && log.authorId == widget.username)
-                                    const Text(' (Milik Anda)', style: TextStyle(fontSize: 10, color: Colors.indigo)),
+                                  Expanded(
+                                    child: Text(
+                                      log.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (log.authorId == widget.username)
+                                    const Text(
+                                      ' (Milik Anda)',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.indigo,
+                                      ),
+                                    ),
                                 ],
                               ),
                               subtitle: Column(
@@ -298,24 +396,85 @@ class _LogViewState extends State<LogView> {
                                   const SizedBox(height: 5),
                                   MarkdownBody(data: log.description),
                                   const SizedBox(height: 8),
-                                  Text(_formatTimestamp(log.timestamp), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                  Text(
+                                    _formatTimestamp(log.timestamp),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
                                 ],
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (canEdit) IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _navigateToEditLog(log)),
-                                  if (canDelete) IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _refreshLogs()), 
+                                  if (canEdit)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.blue,
+                                      ),
+                                      onPressed: () => _navigateToEditLog(log),
+                                    ),
+                                  if (canDelete)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        bool confirm = await showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Hapus Catatan"),
+                                            content: const Text("Yakin ingin menghapus catatan ini?"),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Batal")),
+                                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Hapus", style: TextStyle(color: Colors.red))),
+                                            ],
+                                          ),
+                                        ) ?? false;
+
+                                        if (confirm) {
+                                          await _controller.removeLog(log, widget.role);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text("Catatan dihapus")),
+                                            );
+                                          }
+                                          _refreshLogs();
+                                        }
+                                      },
+                                    ),
                                 ],
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.only(left: 12.0, bottom: 8.0),
+                              padding: const EdgeInsets.only(
+                                left: 12.0,
+                                bottom: 8.0,
+                              ),
                               child: Row(
                                 children: [
-                                  Icon(log.isSynced ? Icons.cloud_done : Icons.cloud_off, color: log.isSynced ? Colors.green : Colors.red, size: 14),
+                                  Icon(
+                                    log.isSynced
+                                        ? Icons.cloud_done
+                                        : Icons.cloud_off,
+                                    color: log.isSynced
+                                        ? Colors.green
+                                        : Colors.red,
+                                    size: 14,
+                                  ),
                                   const SizedBox(width: 4),
-                                  Text(log.isSynced ? "Tersinkronisasi" : "Menunggu jaringan...", style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
+                                  Text(
+                                    log.isSynced
+                                        ? "Tersinkronisasi"
+                                        : "Menunggu jaringan...",
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -327,10 +486,23 @@ class _LogViewState extends State<LogView> {
                         return Dismissible(
                           key: Key(log.timestamp),
                           direction: DismissDirection.endToStart,
-                          background: Container(color: Colors.red, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
+                          background: Container(
+                            color: Colors.red,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
                           onDismissed: (direction) async {
                             await _controller.removeLog(log, widget.role);
-                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Catatan dihapus")));
+                            if (context.mounted)
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Catatan dihapus"),
+                                ),
+                              );
                             _refreshLogs();
                           },
                           child: cardLayout,
@@ -344,12 +516,20 @@ class _LogViewState extends State<LogView> {
                 // Agar RefreshIndicator bekerja pada kondisi kosong
                 return RefreshIndicator(
                   onRefresh: _refreshLogs,
-                  child: currentLogs.isEmpty 
-                    ? LayoutBuilder(builder: (context, constraints) => SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Container(constraints: BoxConstraints(minHeight: constraints.maxHeight), child: content),
-                      ))
-                    : content,
+                  child: currentLogs.isEmpty
+                      ? LayoutBuilder(
+                          builder: (context, constraints) =>
+                              SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: Container(
+                                  constraints: BoxConstraints(
+                                    minHeight: constraints.maxHeight,
+                                  ),
+                                  child: content,
+                                ),
+                              ),
+                        )
+                      : content,
                 );
               },
             ),
@@ -358,9 +538,9 @@ class _LogViewState extends State<LogView> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToAddLog,
+        child: const Icon(Icons.add),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
       ),
     );
   }

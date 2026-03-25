@@ -8,6 +8,7 @@ class LogEditorPage extends StatefulWidget {
   final int? index;
   final LogController controller;
   final dynamic currentUser;
+  final bool readOnly;
 
   const LogEditorPage({
     super.key,
@@ -15,6 +16,7 @@ class LogEditorPage extends StatefulWidget {
     this.index,
     required this.controller,
     required this.currentUser,
+    this.readOnly = false,
   });
 
   @override
@@ -83,14 +85,18 @@ class _LogEditorPageState extends State<LogEditorPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.log == null ? "Catatan Baru" : "Edit Catatan"),
+          title: Text(widget.readOnly 
+              ? "Detail Catatan" 
+              : (widget.log == null ? "Catatan Baru" : "Edit Catatan")),
           bottom: const TabBar(
             tabs: [
               Tab(text: "Editor"),
               Tab(text: "Pratinjau"),
             ],
           ),
-          actions: [IconButton(icon: const Icon(Icons.save), onPressed: _save)],
+          actions: widget.readOnly 
+              ? [] 
+              : [IconButton(icon: const Icon(Icons.save), onPressed: _save)],
         ),
         body: TabBarView(
           children: [
@@ -100,10 +106,10 @@ class _LogEditorPageState extends State<LogEditorPage> {
               child: Column(
                 children: [
                   SwitchListTile(
-                    title: const Text("Catatan Privat"),
+                    title: Text(_isPrivate ? "Catatan Privat" : "Catatan Publik", style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(_isPrivate ? "Hanya Anda yang bisa melihat catatan ini" : "Semua anggota tim dapat melihat catatan ini"),
                     value: _isPrivate,
-                    onChanged: (value) {
+                    onChanged: widget.readOnly ? null : (value) {
                       setState(() {
                         _isPrivate = value;
                       });
@@ -114,6 +120,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
                   const Divider(),
                   TextField(
                     controller: _titleController,
+                    readOnly: widget.readOnly,
                     decoration: const InputDecoration(labelText: "Judul"),
                   ),
                   const SizedBox(height: 10),
@@ -122,6 +129,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
                       controller: _descController,
                       maxLines: null,
                       expands: true,
+                      readOnly: widget.readOnly,
                       keyboardType: TextInputType.multiline,
                       decoration: const InputDecoration(
                         hintText: "Tulis laporan dengan format Markdown...",
@@ -141,7 +149,7 @@ class _LogEditorPageState extends State<LogEditorPage> {
                       DropdownMenuItem(value: 'Electronic', child: Text('Electronic')),
                       DropdownMenuItem(value: 'Software', child: Text('Software')),
                     ],
-                    onChanged: (value) {
+                    onChanged: widget.readOnly ? null : (value) {
                       setState(() {
                         if (value != null) _selectedCategory = value;
                       });

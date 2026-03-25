@@ -22,13 +22,12 @@ class LogController {
         .where((log) => log.teamId == teamId && !log.isDeleted)
         .toList();
     if (role != 'Ketua') {
-      localLogs = localLogs.where((log) => log.authorId == username).toList();
-    } else {
       localLogs = localLogs
           .where((log) => !log.isPrivate || log.authorId == username)
           .toList();
+    } else {
     }
-    
+
     // Sort descending
     localLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
@@ -48,7 +47,9 @@ class LogController {
     String category,
     bool isPrivate,
   ) async {
-    debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Menambahkan data baru (lokal/offline). Akun: $username, Judul: $title');
+    debugPrint(
+      '[${DateTime.now().toIso8601String()}] [LogController] Menambahkan data baru (lokal/offline). Akun: $username, Judul: $title',
+    );
     final newLog = LogModel(
       title: title,
       description: desc,
@@ -56,7 +57,8 @@ class LogController {
       category: category,
       teamId: teamId,
       authorId: username,
-      isSynced: false, // Ditandai belum sinkron agar diurus oleh worker latar belakang
+      isSynced:
+          false, // Ditandai belum sinkron agar diurus oleh worker latar belakang
       isPrivate: isPrivate,
     );
 
@@ -67,10 +69,9 @@ class LogController {
       " -> Kategori: '$category'",
       level: 2,
     );
-    
+
     await _offlineLogsBox.add(newLog);
     _refreshUINotifiers();
-    syncUnsyncedLogs(); // Fire and forget
   }
 
   Future<void> updateLog(
@@ -80,7 +81,9 @@ class LogController {
     String category,
     bool isPrivate,
   ) async {
-    debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Memperbarui data (lokal/offline). Akun: $username, Judul: $title');
+    debugPrint(
+      '[${DateTime.now().toIso8601String()}] [LogController] Memperbarui data (lokal/offline). Akun: $username, Judul: $title',
+    );
     await LogHelper.writeLog(
       "AKSI PENGGUNA: Memperbarui Catatan (ID Asli: ${oldLog.id?.toHexString() ?? 'Offline Draft'}).\n"
       " -> Judul: '${oldLog.title}' diubah menjadi '$title'\n"
@@ -88,7 +91,7 @@ class LogController {
       " -> Privasi: ${oldLog.isPrivate ? 'Privat' : 'Publik'} diubah menjadi ${isPrivate ? 'Privat' : 'Publik'}",
       level: 2,
     );
-    
+
     final newLog = LogModel(
       id: oldLog.id,
       title: title,
@@ -105,16 +108,18 @@ class LogController {
     if (index != -1) {
       await _offlineLogsBox.putAt(index, newLog);
       _refreshUINotifiers();
-      syncUnsyncedLogs(); // Fire and forget
     }
   }
 
   Future<void> removeLog(LogModel logToRemove, String role) async {
-    debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Menghapus data (lokal/offline). Akun: $username, Judul: ${logToRemove.title}');
+    debugPrint(
+      '[${DateTime.now().toIso8601String()}] [LogController] Menghapus data (lokal/offline). Akun: $username, Judul: ${logToRemove.title}',
+    );
     if (!AccessControlService.canPerform(
       role,
       AccessControlService.actionDelete,
       isOwner: logToRemove.authorId == username,
+      isPrivate: logToRemove.isPrivate,
     )) {
       await LogHelper.writeLog(
         "SECURITY BREACH: Unauthorized delete attempt pada '${logToRemove.title}'",
@@ -134,7 +139,6 @@ class LogController {
       logToRemove.isSynced = false;
       await _offlineLogsBox.putAt(index, logToRemove);
       _refreshUINotifiers();
-      syncUnsyncedLogs(); // Fire and forget
     }
   }
 
@@ -143,19 +147,25 @@ class LogController {
     _isSyncing = true;
     bool uiNeedsRefresh = false;
 
-    debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Memulai proses sinkronisasi (cek status jaringan & data)...');
+    debugPrint(
+      '[${DateTime.now().toIso8601String()}] [LogController] Memulai proses sinkronisasi (cek status jaringan & data)...',
+    );
 
     try {
       final unsyncedLogs = _offlineLogsBox.values
           .where((log) => log.teamId == teamId && !log.isSynced)
           .toList();
-      
+
       if (unsyncedLogs.isEmpty) {
-        debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Tidak ada data tertunda untuk disinkronkan.');
+        debugPrint(
+          '[${DateTime.now().toIso8601String()}] [LogController] Tidak ada data tertunda untuk disinkronkan.',
+        );
         return;
       }
 
-      debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Menemukan ${unsyncedLogs.length} data tertunda untuk disinkronkan. Mencoba koneksi ke cloud...');
+      debugPrint(
+        '[${DateTime.now().toIso8601String()}] [LogController] Menemukan ${unsyncedLogs.length} data tertunda untuk disinkronkan. Mencoba koneksi ke cloud...',
+      );
 
       await LogHelper.writeLog(
         "Memulai sinkronisasi latar belakang untuk ${unsyncedLogs.length} catatan tertunda.",
@@ -167,7 +177,9 @@ class LogController {
         try {
           if (log.isDeleted) {
             if (log.id != null) {
-              debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Menghapus data di cloud. Akun: ${log.authorId}, Judul: ${log.title}');
+              debugPrint(
+                '[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Menghapus data di cloud. Akun: ${log.authorId}, Judul: ${log.title}',
+              );
               await MongoService().deleteLog(log.id!);
               await LogHelper.writeLog(
                 "=> Menghapus Batu Nisan Offline secara permanen dari Cloud: ${log.title}",
@@ -177,11 +189,13 @@ class LogController {
             final index = _findLogIndex(log);
             if (index != -1) await _offlineLogsBox.deleteAt(index);
             uiNeedsRefresh = true;
-            continue; 
+            continue;
           }
 
           if (log.id == null) {
-            debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Mendorong data baru ke cloud (dibuat offline). Akun: ${log.authorId}, Judul: ${log.title}');
+            debugPrint(
+              '[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Mendorong data baru ke cloud (dibuat offline). Akun: ${log.authorId}, Judul: ${log.title}',
+            );
             final insertedId = await MongoService().insertLog(log);
             log = LogModel(
               id: insertedId,
@@ -201,7 +215,9 @@ class LogController {
             );
           } else {
             // Catatan lama yang di-edit saat Luring
-            debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Memperbarui data ke cloud (diedit offline). Akun: ${log.authorId}, Judul: ${log.title}');
+            debugPrint(
+              '[${DateTime.now().toIso8601String()}] [LogController] Sinkronisasi: Memperbarui data ke cloud (diedit offline). Akun: ${log.authorId}, Judul: ${log.title}',
+            );
             await MongoService().updateLog(log);
             log.isSynced = true;
             await LogHelper.writeLog(
@@ -216,7 +232,9 @@ class LogController {
             uiNeedsRefresh = true;
           }
         } catch (e, stacktrace) {
-          debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Koneksi offline atau error saat sinkronisasi data "${log.title}": $e');
+          debugPrint(
+            '[${DateTime.now().toIso8601String()}] [LogController] Koneksi offline atau error saat sinkronisasi data "${log.title}": $e',
+          );
           await LogHelper.writeLog(
             "Gagal menyinkronkan cacatan tertunda: ${log.title}\nError: $e\n$stacktrace",
             level: 1,
@@ -244,11 +262,11 @@ class LogController {
         .where((log) => log.teamId == teamId && !log.isDeleted)
         .toList();
     if (role != 'Ketua') {
-      localLogs = localLogs.where((log) => log.authorId == username).toList();
-    } else {
       localLogs = localLogs
           .where((log) => !log.isPrivate || log.authorId == username)
           .toList();
+    } else {
+      // Ketua bisa melihat semua (termasuk private)
     }
 
     if (localLogs.isNotEmpty) {
@@ -259,7 +277,9 @@ class LogController {
 
     // 2. SINKRONISASI: Coba ambil dari Cloud. Jika berhasil, timpa data Hive (Resilient Logger)
     try {
-      debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Memeriksa koneksi jaringan. Mengambil data dari Cloud...');
+      debugPrint(
+        '[${DateTime.now().toIso8601String()}] [LogController] Memeriksa koneksi jaringan. Mengambil data dari Cloud...',
+      );
       await LogHelper.writeLog(
         "Mencoba menarik daftar data terbaru dari MongoDB Cloud...",
         level: 3,
@@ -269,9 +289,11 @@ class LogController {
         username,
         role,
       );
-      debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Terhubung ke jaringan. Berhasil mengambil ${cloudLogs.length} data dari Cloud.');
+      debugPrint(
+        '[${DateTime.now().toIso8601String()}] [LogController] Terhubung ke jaringan. Berhasil mengambil ${cloudLogs.length} data dari Cloud.',
+      );
       await LogHelper.writeLog(
-        "TARIKAN CLOUD BERHASIL: Ditemukan ${cloudLogs.length} catatan total untuk tim $teamId. (Role: $role)",
+        "FETCH CLOUD BERHASIL: Ditemukan ${cloudLogs.length} catatan total untuk tim $teamId. (Role: $role)",
         level: 2,
       );
 
@@ -283,15 +305,11 @@ class LogController {
       // Filter pendingLogs sesuai role dan buang yang batu nisan.
       if (role != 'Ketua') {
         pendingLogs = pendingLogs
-            .where((log) => log.authorId == username && !log.isDeleted)
+            .where((log) => (!log.isPrivate || log.authorId == username) && !log.isDeleted)
             .toList();
       } else {
         pendingLogs = pendingLogs
-            .where(
-              (log) =>
-                  (!log.isPrivate || log.authorId == username) &&
-                  !log.isDeleted,
-            )
+            .where((log) => !log.isDeleted)
             .toList();
       }
 
@@ -309,7 +327,7 @@ class LogController {
       for (final log in filteredCloudLogs) {
         merged[log.timestamp] = log;
       }
-      // Agar catatan offline yang baru menetas mendapat suntikan _id dari Cloud, 
+      // Agar catatan offline yang baru menetas mendapat suntikan _id dari Cloud,
       // namun kita tetap mempertahankan isi versi lokalnya (yang mungkin baru diedit Offline)
       for (var log in pendingLogs) {
         final existingCloudLog = merged[log.timestamp];
@@ -332,7 +350,7 @@ class LogController {
         }
         merged[log.timestamp] = log;
       }
-      
+
       final combinedLogs = merged.values.toList();
 
       // Update UI dengan data gabungan
@@ -368,7 +386,9 @@ class LogController {
         await _offlineLogsBox.putAt(index, cloudLog);
       }
     } catch (e, stacktrace) {
-      debugPrint('[${DateTime.now().toIso8601String()}] [LogController] Offline atau jaringan terputus. Gagal mengambil data: $e. Memakai mode offline.');
+      debugPrint(
+        '[${DateTime.now().toIso8601String()}] [LogController] Offline atau jaringan terputus. Gagal mengambil data: $e. Memakai mode offline.',
+      );
       // Gagal ambil Cloud (Offline), tetap gunakan `localLogs`
       await LogHelper.writeLog(
         "Memuat log lokal menggunakan Hive sebagai Fallback. Tidak ada koneksi: $e\n$stacktrace",
